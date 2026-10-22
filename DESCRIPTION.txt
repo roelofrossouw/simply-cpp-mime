@@ -1,0 +1,1 @@
+MIME mail messages for simply-cpp: headers, addresses, body text and attachments (GMime)

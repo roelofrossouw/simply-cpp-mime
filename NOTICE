@@ -1,0 +1,7 @@
+simply-cpp-mime
+Copyright 2026 Roelof Rossouw
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Uses GMime (LGPL-2.1-or-later) and GLib (LGPL-2.1-or-later), linked dynamically from the
+system.
