@@ -2,8 +2,9 @@
 
 `sc-mime` reads mail messages (MIME: RFC 5322, 2045-2049, 2183, 2231) and hands
 you what's in them, decoded: the sender and recipients, the subject and date,
-the body text in UTF-8, and the attachments' bytes. [GMime](https://github.com/jstedfast/gmime)
-does the parsing, and none of GMime or GLib shows in the API.
+the body text in UTF-8, and the attachments' bytes; and writes them (`draft`: addresses,
+subject, headers, text and HTML, attachments). [GMime](https://github.com/jstedfast/gmime)
+does the parsing and writing, and none of GMime or GLib shows in the API.
 
 **Documentation:** the [simply-cpp wiki](https://github.com/roelofrossouw/simply-cpp/wiki) has a [Mail guide](https://github.com/roelofrossouw/simply-cpp/wiki/Mail) and the [sc-mime reference](https://github.com/roelofrossouw/simply-cpp/wiki/Reference-sc-mime).
 
@@ -41,6 +42,7 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
 | `sc::mime::mailbox` | `name`, `address`; `str()` | "Ann <ann@example.com>" |
 | `sc::mime::header` | `name`, `value` | unfolded, decoded |
 | `sc::mime::disposition` | `none`, `inline_`, `attachment` | Content-Disposition |
+| `sc::mime::draft` | `from()`, `to()`, `cc()`, `bcc()`, `reply_to()`, `subject()`, `header()`, `text()`, `html()`, `attach()`; `str()` | a message to write |
 | `sc::mime::transfer_encoding` | `none`, `seven_bit`, `eight_bit`, `binary`, `base64`, `quoted_printable`, `uuencode` | Content-Transfer-Encoding |
 
 - **Body text:** `text()` is the text/plain alternative of a multipart/alternative;
@@ -59,7 +61,11 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
 - `parse()` and `load()` throw `std::runtime_error` when there's no message to
   read (no headers); GMime takes most of what's found in real mailboxes.
 - A message and its parts are read only; use each from one thread at a time.
-- Not yet: writing messages, mbox files, S/MIME and PGP (GMime can do all three).
+- **Writing:** `sc::mime::draft{}.from(...).to(...).subject(...).text(...).html(...).str()`
+  makes a message for `sendmail -t` (or `str(true)` for SMTP's CRLF): text and HTML as
+  multipart/alternative, attachments base64 in multipart/mixed, UTF-8 subjects and names
+  encoded, Date set. `sc-mime-demo --reply` writes a reply this way.
+- Not yet: mbox files, S/MIME and PGP (GMime can do all three).
 
 ## Building
 

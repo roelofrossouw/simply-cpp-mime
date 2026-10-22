@@ -1,8 +1,9 @@
 #ifndef SC_MIME_H
 #define SC_MIME_H
 // MIME mail messages (RFC 5322, 2045-2049, 2183, 2231): read one, from a file or from memory,
-// and get its headers, addresses, date, body text and attachments, every part of it decoded.
-// GMime does the parsing; nothing of GMime or GLib shows here.
+// and get its headers, addresses, date, body text and attachments, every part of it decoded; or
+// write one (draft): addresses, subject, headers, a text and an HTML body, attachments.
+// GMime does the parsing and the writing; nothing of GMime or GLib shows here.
 #include <datetime.h>
 
 #include <filesystem>
@@ -188,6 +189,59 @@ namespace sc::mime {
 
         std::shared_ptr<const detail::document> document_;
         _GMimeMessage *message_;
+    };
+
+    // A message to send, built up and written as text: for "sendmail -t", an SMTP client or a file.
+    // Names and the subject in UTF-8 are encoded as they must be (RFC 2047); text goes as UTF-8,
+    // quoted-printable when it needs to; attachments go base64. With both text() and html() the
+    // body is multipart/alternative (mail programs show the HTML, or the text when they can't);
+    // with attachments, multipart/mixed around it. Date is set when it's written.
+    //
+    //     const auto mail = sc::mime::draft{}
+    //         .from({"IDs", "id@example.com"})
+    //         .to({"Ann Smith", "ann@example.com"})
+    //         .subject("Re: Our IDs")
+    //         .header("In-Reply-To", "<m1@example.com>")
+    //         .text("Thanks, 2 identities were loaded.")
+    //         .html("<p>Thanks, <b>2</b> identities were loaded.</p>")
+    //         .str();
+    class draft {
+    public:
+        draft &from(const mailbox &who);
+        // Each call adds one.
+        draft &to(const mailbox &who);
+        draft &cc(const mailbox &who);
+        draft &bcc(const mailbox &who);
+        draft &reply_to(const mailbox &who);
+        draft &subject(std::string_view text);
+
+        // Any other header, as given (In-Reply-To, References, Auto-Submitted, X-...): a value in
+        // UTF-8 that isn't plain ASCII is encoded. Each call adds one; the same name may repeat.
+        draft &header(std::string_view name, std::string_view value);
+
+        // The body: plain text, HTML, or both (multipart/alternative). UTF-8, "\n" line ends.
+        draft &text(std::string_view utf8);
+        draft &html(std::string_view utf8);
+
+        // A file, after the body (multipart/mixed). type: "application/pdf"; inline_: shown in the
+        // HTML rather than offered to save, content_id the HTML's "cid:" link names.
+        draft &attach(std::string_view filename, std::string_view type, std::string bytes, bool inline_ = false,
+                      std::string_view content_id = {});
+
+        // The message as it's sent: headers, a blank line, the body. Line ends "\n" (what sendmail
+        // reads), or "\r\n" as SMTP sends them.
+        [[nodiscard]] std::string str(bool crlf = false) const;
+
+    private:
+        struct file {
+            std::string filename, type, bytes, content_id;
+            bool inline_ = false;
+        };
+        std::vector<std::pair<std::string, mailbox>> addresses_; // "from", "to", "cc", "bcc", "reply-to"
+        std::optional<std::string> subject_;
+        std::vector<mime::header> headers_;
+        std::optional<std::string> text_, html_;
+        std::vector<file> files_;
     };
 }
 

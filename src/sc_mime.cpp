@@ -356,4 +356,116 @@ namespace sc::mime {
         std::erase_if(out, [](const part &each) { return !each.is_attachment(); });
         return out;
     }
+
+    draft &draft::from(const mailbox &who) { addresses_.emplace_back("from", who); return *this; }
+    draft &draft::to(const mailbox &who) { addresses_.emplace_back("to", who); return *this; }
+    draft &draft::cc(const mailbox &who) { addresses_.emplace_back("cc", who); return *this; }
+    draft &draft::bcc(const mailbox &who) { addresses_.emplace_back("bcc", who); return *this; }
+    draft &draft::reply_to(const mailbox &who) { addresses_.emplace_back("reply-to", who); return *this; }
+
+    draft &draft::subject(const std::string_view text) {
+        subject_ = std::string{text};
+        return *this;
+    }
+
+    draft &draft::header(const std::string_view name, const std::string_view value) {
+        headers_.push_back({std::string{name}, std::string{value}});
+        return *this;
+    }
+
+    draft &draft::text(const std::string_view utf8) {
+        text_ = std::string{utf8};
+        return *this;
+    }
+
+    draft &draft::html(const std::string_view utf8) {
+        html_ = std::string{utf8};
+        return *this;
+    }
+
+    draft &draft::attach(const std::string_view filename, const std::string_view type, std::string bytes, const bool inline_,
+                         const std::string_view content_id) {
+        files_.push_back({std::string{filename}, std::string{type}, std::move(bytes), std::string{content_id}, inline_});
+        return *this;
+    }
+
+    namespace {
+        GMimeAddressType address_type(const std::string &kind) {
+            if (kind == "from") return GMIME_ADDRESS_TYPE_FROM;
+            if (kind == "to") return GMIME_ADDRESS_TYPE_TO;
+            if (kind == "cc") return GMIME_ADDRESS_TYPE_CC;
+            if (kind == "bcc") return GMIME_ADDRESS_TYPE_BCC;
+            return GMIME_ADDRESS_TYPE_REPLY_TO;
+        }
+
+        // A text part in UTF-8, in the lightest encoding that stays 7-bit clean.
+        // The bytes as given (g_mime_text_part_set_text would convert them to a charset of its choice).
+        GMimeObject *text_part(const char *subtype, const std::string &utf8) {
+            GMimeTextPart *part = g_mime_text_part_new_with_subtype(subtype);
+            g_mime_object_set_content_type_parameter(GMIME_OBJECT(part), "charset", "utf-8");
+            const owned<GMimeStream> stream{g_mime_stream_mem_new_with_buffer(utf8.data(), utf8.size())};
+            const owned<GMimeDataWrapper> content{g_mime_data_wrapper_new_with_stream(stream.object, GMIME_CONTENT_ENCODING_DEFAULT)};
+            g_mime_part_set_content(GMIME_PART(part), content.object);
+            g_mime_part_set_content_encoding(GMIME_PART(part),
+                                             g_mime_part_get_best_content_encoding(GMIME_PART(part), GMIME_ENCODING_CONSTRAINT_7BIT));
+            return GMIME_OBJECT(part);
+        }
+
+        // Adds part to multipart, which keeps its own reference.
+        void add(GMimeMultipart *multipart, GMimeObject *part) {
+            g_mime_multipart_add(multipart, part);
+            g_object_unref(part);
+        }
+    }
+
+    std::string draft::str(const bool crlf) const {
+        start_gmime();
+        const owned<GMimeMessage> message{g_mime_message_new(TRUE)};
+        for (const auto &[kind, who]: addresses_)
+            g_mime_message_add_mailbox(message.object, address_type(kind), who.name.empty() ? nullptr : who.name.c_str(), who.address.c_str());
+        if (subject_) g_mime_message_set_subject(message.object, subject_->c_str(), "utf-8");
+        GDateTime *now = g_date_time_new_now_local();
+        g_mime_message_set_date(message.object, now);
+        g_date_time_unref(now);
+        for (const auto &[name, value]: headers_)
+            g_mime_object_append_header(GMIME_OBJECT(message.object), name.c_str(), value.c_str(), "utf-8");
+
+        GMimeObject *body;
+        if (text_ && html_) {
+            GMimeMultipart *alternative = g_mime_multipart_new_with_subtype("alternative");
+            add(alternative, text_part("plain", *text_));
+            add(alternative, text_part("html", *html_));
+            body = GMIME_OBJECT(alternative);
+        } else {
+            body = html_ ? text_part("html", *html_) : text_part("plain", text_.value_or(""));
+        }
+        if (!files_.empty()) {
+            GMimeMultipart *mixed = g_mime_multipart_new_with_subtype("mixed");
+            add(mixed, body);
+            for (const auto &each: files_) {
+                const auto slash = each.type.find('/');
+                const auto type = each.type.substr(0, slash);
+                const auto subtype = slash == std::string::npos ? std::string{"octet-stream"} : each.type.substr(slash + 1);
+                GMimePart *part = g_mime_part_new_with_type(type.c_str(), subtype.c_str());
+                g_mime_object_set_disposition(GMIME_OBJECT(part), each.inline_ ? "inline" : "attachment");
+                if (!each.filename.empty()) g_mime_part_set_filename(part, each.filename.c_str());
+                if (!each.content_id.empty()) g_mime_part_set_content_id(part, each.content_id.c_str());
+                const owned<GMimeStream> stream{g_mime_stream_mem_new_with_buffer(each.bytes.data(), each.bytes.size())};
+                const owned<GMimeDataWrapper> content{g_mime_data_wrapper_new_with_stream(stream.object, GMIME_CONTENT_ENCODING_DEFAULT)};
+                g_mime_part_set_content(part, content.object);
+                g_mime_part_set_content_encoding(part, GMIME_CONTENT_ENCODING_BASE64);
+                add(mixed, GMIME_OBJECT(part));
+            }
+            body = GMIME_OBJECT(mixed);
+        }
+        g_mime_message_set_mime_part(message.object, body);
+        g_object_unref(body);
+
+        GMimeFormatOptions *options = g_mime_format_options_new();
+        g_mime_format_options_set_newline_format(options, crlf ? GMIME_NEWLINE_FORMAT_DOS : GMIME_NEWLINE_FORMAT_UNIX);
+        const owned<GMimeStream> stream{g_mime_stream_mem_new()};
+        g_mime_object_write_to_stream(GMIME_OBJECT(message.object), options, stream.object);
+        g_mime_format_options_free(options);
+        return bytes_of(stream.object);
+    }
 }
