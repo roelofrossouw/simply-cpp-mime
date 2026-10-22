@@ -1,9 +1,10 @@
 // Shows a mail message (.eml): who it's from and to, the subject and date, the start of its text,
-// and its attachments; --extract saves the attachments into a folder. Without a file, it reads a
-// small message of its own.
+// and its attachments; --extract saves the attachments into a folder, --reply writes a reply to it
+// (sc::mime::draft: text and HTML). Without a file, it reads a small message of its own.
 //
 //     sc-mime-demo invoice.eml
 //     sc-mime-demo invoice.eml --extract out
+//     sc-mime-demo invoice.eml --reply | sendmail -t
 
 #include <sc_mime.h>
 #include <params.h>
@@ -43,16 +44,29 @@ int main(int argc, char **argv) {
     const sc::params args{argc, argv, {
         {"name", "sc-mime-demo"},
         {"description", "Shows a mail message (.eml): sender, recipients, subject, date, the start of its text and "
-                        "its attachments, or saves the attachments with --extract. Without a file, it reads a small "
-                        "message of its own."},
+                        "its attachments, saves the attachments with --extract, or writes a reply to it with --reply "
+                        "(text and HTML, threaded under it). Without a file, it reads a small message of its own."},
         {"options", {
-            {"extract", {{"short", "x"}, {"value", "FOLDER"}, {"default", ""}, {"help", "save the attachments into FOLDER"}}}}},
+            {"extract", {{"short", "x"}, {"value", "FOLDER"}, {"default", ""}, {"help", "save the attachments into FOLDER"}}},
+            {"reply", {{"short", "r"}, {"type", "boolean"}, {"help", "write a reply to it instead (for sendmail -t)"}}}}},
         {"positional", {
             {"file", {{"default", ""}, {"help", "the message (.eml)"}}}}}}};
     try {
         // [readme]
         const auto file = args.as<std::string>("file");
         const auto mail = file.empty() ? sc::mime::message::parse(sample) : sc::mime::message::load(file);
+        if (args.as<bool>("reply")) {
+            // To the Reply-To (else the sender), "Re: " and the subject, threaded under it.
+            const auto senders = mail.reply_to().empty() ? mail.from() : mail.reply_to();
+            auto reply = sc::mime::draft{}.subject("Re: " + mail.subject()).header("Auto-Submitted", "auto-replied");
+            for (const auto &who: senders) reply.to(who);
+            if (const auto id = mail.message_id(); !id.empty()) reply.header("In-Reply-To", "<" + id + ">");
+            const auto files = mail.attachments().size();
+            reply.text("Thanks, " + std::to_string(files) + " attachment(s) received.\n")
+                .html("<p>Thanks, <b>" + std::to_string(files) + "</b> attachment(s) received.</p>\n");
+            std::cout << reply.str();
+            return 0;
+        }
         std::cout << "From:    " << list(mail.from()) << '\n'
                   << "To:      " << list(mail.to()) << '\n'
                   << "Subject: " << mail.subject() << '\n';
