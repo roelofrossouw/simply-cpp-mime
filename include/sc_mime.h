@@ -195,7 +195,8 @@ namespace sc::mime {
     // Names and the subject in UTF-8 are encoded as they must be (RFC 2047); text goes as UTF-8,
     // quoted-printable when it needs to; attachments go base64. With both text() and html() the
     // body is multipart/alternative (mail programs show the HTML, or the text when they can't);
-    // with attachments, multipart/mixed around it. Date is set when it's written.
+    // pictures the HTML shows (inline, with a Content-ID) go with it in multipart/related; other
+    // attachments in multipart/mixed around it all. Date is set when it's written.
     //
     //     const auto mail = sc::mime::draft{}
     //         .from({"IDs", "id@example.com"})
@@ -223,8 +224,8 @@ namespace sc::mime {
         draft &text(std::string_view utf8);
         draft &html(std::string_view utf8);
 
-        // A file, after the body (multipart/mixed). type: "application/pdf"; inline_: shown in the
-        // HTML rather than offered to save, content_id the HTML's "cid:" link names.
+        // A file, after the body (multipart/mixed). type: "application/pdf". inline_ with a
+        // content_id: a picture the HTML shows as <img src="cid:content_id"> (multipart/related).
         draft &attach(std::string_view filename, std::string_view type, std::string bytes, bool inline_ = false,
                       std::string_view content_id = {});
 

@@ -439,22 +439,37 @@ namespace sc::mime {
         } else {
             body = html_ ? text_part("html", *html_) : text_part("plain", text_.value_or(""));
         }
-        if (!files_.empty()) {
+        // A file as a part: base64, its disposition, name and Content-ID.
+        const auto file_part = [](const file &each) {
+            const auto slash = each.type.find('/');
+            const auto type = each.type.substr(0, slash);
+            const auto subtype = slash == std::string::npos ? std::string{"octet-stream"} : each.type.substr(slash + 1);
+            GMimePart *part = g_mime_part_new_with_type(type.c_str(), subtype.c_str());
+            g_mime_object_set_disposition(GMIME_OBJECT(part), each.inline_ ? "inline" : "attachment");
+            if (!each.filename.empty()) g_mime_part_set_filename(part, each.filename.c_str());
+            if (!each.content_id.empty()) g_mime_part_set_content_id(part, each.content_id.c_str());
+            const owned<GMimeStream> stream{g_mime_stream_mem_new_with_buffer(each.bytes.data(), each.bytes.size())};
+            const owned<GMimeDataWrapper> content{g_mime_data_wrapper_new_with_stream(stream.object, GMIME_CONTENT_ENCODING_DEFAULT)};
+            g_mime_part_set_content(part, content.object);
+            g_mime_part_set_content_encoding(part, GMIME_CONTENT_ENCODING_BASE64);
+            return GMIME_OBJECT(part);
+        };
+        // Pictures the HTML shows (inline, with a Content-ID) go with it in multipart/related
+        // (RFC 2387), where mail programs look for "cid:" links; the rest in multipart/mixed.
+        const auto shown = [](const file &each) { return each.inline_ && !each.content_id.empty(); };
+        if (std::ranges::any_of(files_, shown)) {
+            GMimeMultipart *related = g_mime_multipart_new_with_subtype("related");
+            add(related, body);
+            for (const auto &each: files_)
+                if (shown(each)) add(related, file_part(each));
+            body = GMIME_OBJECT(related);
+        }
+        if (!std::ranges::all_of(files_, shown)) {
             GMimeMultipart *mixed = g_mime_multipart_new_with_subtype("mixed");
             add(mixed, body);
             for (const auto &each: files_) {
-                const auto slash = each.type.find('/');
-                const auto type = each.type.substr(0, slash);
-                const auto subtype = slash == std::string::npos ? std::string{"octet-stream"} : each.type.substr(slash + 1);
-                GMimePart *part = g_mime_part_new_with_type(type.c_str(), subtype.c_str());
-                g_mime_object_set_disposition(GMIME_OBJECT(part), each.inline_ ? "inline" : "attachment");
-                if (!each.filename.empty()) g_mime_part_set_filename(part, each.filename.c_str());
-                if (!each.content_id.empty()) g_mime_part_set_content_id(part, each.content_id.c_str());
-                const owned<GMimeStream> stream{g_mime_stream_mem_new_with_buffer(each.bytes.data(), each.bytes.size())};
-                const owned<GMimeDataWrapper> content{g_mime_data_wrapper_new_with_stream(stream.object, GMIME_CONTENT_ENCODING_DEFAULT)};
-                g_mime_part_set_content(part, content.object);
-                g_mime_part_set_content_encoding(part, GMIME_CONTENT_ENCODING_BASE64);
-                add(mixed, GMIME_OBJECT(part));
+                if (shown(each)) continue;
+                add(mixed, file_part(each));
             }
             body = GMIME_OBJECT(mixed);
         }

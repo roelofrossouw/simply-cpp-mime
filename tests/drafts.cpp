@@ -40,19 +40,22 @@ int main() {
         CHECK(mail.date().has_value());
         CHECK(mail.text() == std::optional<std::string>{"Thanks, 2 identities.\nSecond line, é.\n"});
         CHECK(mail.html() == std::optional<std::string>{"<p>Thanks, <b>2</b> identities, é.</p>\n"});
+        // mixed { related { alternative { text, html }, logo }, scan.pdf }
         CHECK(mail.body().is("multipart/mixed"));
-        CHECK(mail.body().parts().at(0).is("multipart/alternative"));
+        CHECK(mail.body().parts().at(0).is("multipart/related"));
+        CHECK(mail.body().parts().at(0).parts().at(0).is("multipart/alternative"));
+        CHECK(mail.body().parts().at(1).is("application/pdf"));
         const auto files = mail.attachments();
         CHECK_EQ(files.size(), std::size_t{2});
         if (files.size() == 2) {
-            CHECK(files[0].filename() == std::optional<std::string>{"scan.pdf"});
-            CHECK(files[0].is("application/pdf"));
-            CHECK(files[0].disposition() == sc::mime::disposition::attachment);
-            CHECK(files[0].data() == pdf);
-            CHECK(files[0].transfer_encoding() == sc::mime::transfer_encoding::base64);
-            CHECK(files[1].disposition() == sc::mime::disposition::inline_);
-            CHECK_EQ(files[1].content_id(), std::string{"logo@example.com"});
-            CHECK_EQ(files[1].data(), std::string{"PNG"});
+            CHECK(files[0].disposition() == sc::mime::disposition::inline_);
+            CHECK_EQ(files[0].content_id(), std::string{"logo@example.com"});
+            CHECK_EQ(files[0].data(), std::string{"PNG"});
+            CHECK(files[1].filename() == std::optional<std::string>{"scan.pdf"});
+            CHECK(files[1].is("application/pdf"));
+            CHECK(files[1].disposition() == sc::mime::disposition::attachment);
+            CHECK(files[1].data() == pdf);
+            CHECK(files[1].transfer_encoding() == sc::mime::transfer_encoding::base64);
         }
     }
 
@@ -66,6 +69,20 @@ int main() {
         CHECK(mail.text() == std::optional<std::string>{"Hello\nthere\n"});
         CHECK(mail.attachments().empty());
         CHECK(mail.body().transfer_encoding() != sc::mime::transfer_encoding::base64);
+    }
+
+    SECTION("Only pictures for the HTML: multipart/related, no mixed");
+    {
+        const auto mail = sc::mime::message::parse(sc::mime::draft{}
+                                                       .to({"", "a@example.com"})
+                                                       .text("x")
+                                                       .html("<img src=\"cid:p1@x\">")
+                                                       .attach("p1.jpg", "image/jpeg", "JPEG", true, "p1@x")
+                                                       .str());
+        CHECK(mail.body().is("multipart/related"));
+        CHECK(mail.html() == std::optional<std::string>{"<img src=\"cid:p1@x\">"});
+        CHECK(mail.text() == std::optional<std::string>{"x"});
+        CHECK_EQ(mail.attachments().size(), std::size_t{1});
     }
 
     SECTION("HTML only, and an empty draft still makes a message");
