@@ -63,7 +63,8 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
 - A message and its parts are read only; use each from one thread at a time.
 - **Writing:** `sc::mime::draft{}.from(...).to(...).subject(...).text(...).html(...).str()`
   makes a message for `sendmail -t` (or `str(true)` for SMTP's CRLF): text and HTML as
-  multipart/alternative, attachments base64 in multipart/mixed, UTF-8 subjects and names
+  multipart/alternative, pictures the HTML shows (`cid:`) with it in multipart/related,
+  other attachments base64 in multipart/mixed, UTF-8 subjects and names
   encoded, Date set. `sc-mime-demo --reply` writes a reply this way.
 - Not yet: mbox files, S/MIME and PGP (GMime can do all three).
 
