@@ -66,6 +66,17 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
   multipart/alternative, pictures the HTML shows (`cid:`) with it in multipart/related,
   other attachments base64 in multipart/mixed, UTF-8 subjects and names
   encoded, Date set. `sc-mime-demo --reply` writes a reply this way.
+- **Outlook .msg** (since 1.2.0): `parse()` and `load()` take a .msg file's bytes too
+  (`is_outlook()`: a compound file), turned into MIME in memory by `outlook_to_mime()`, so a
+  .msg reads like an .eml: From (the SMTP address when the file has one, not an Exchange
+  one), To, Cc and Bcc from its recipients, Subject, Date (when it was sent), Message-ID, the
+  text body, HTML from the file's HTML or its RTF, attachments with their names, types and
+  Content-IDs (inline pictures in multipart/related), an attached message as a message part
+  of its own. Our own reader ([MS-CFB], [MS-OXMSG]): no msgconvert, nothing written.
+- **RTF:** `rtf_to_html(rtf)` gives the HTML Outlook wraps in RTF (`\fromhtml1`) as it was,
+  and other RTF as simple HTML of its text, paragraphs and line breaks;
+  `decompress_rtf()` reads Outlook's compressed RTF (LZFu, or MELA stored as it is).
+- `draft::date(when)` sets the Date; without it, the time it's written.
 - Not yet: mbox files, S/MIME and PGP (GMime can do all three).
 
 ## Building

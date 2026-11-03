@@ -259,6 +259,7 @@ namespace sc::mime {
         : document_(std::move(document)), message_(gmime) {}
 
     message message::parse(const std::string_view text) {
+        if (is_outlook(text)) return parse(outlook_to_mime(text));
         // GMime before 3.2.13 (jammy's 3.2.7) makes an empty message of nothing.
         if (text.find_first_not_of(" \t\r\n") == std::string_view::npos) throw std::runtime_error("sc::mime: not a mail message");
         start_gmime();
@@ -418,13 +419,18 @@ namespace sc::mime {
         }
     }
 
+    draft &draft::date(const sc::datetime &when) {
+        date_ = when;
+        return *this;
+    }
+
     std::string draft::str(const bool crlf) const {
         start_gmime();
         const owned<GMimeMessage> message{g_mime_message_new(TRUE)};
         for (const auto &[kind, who]: addresses_)
             g_mime_message_add_mailbox(message.object, address_type(kind), who.name.empty() ? nullptr : who.name.c_str(), who.address.c_str());
         if (subject_) g_mime_message_set_subject(message.object, subject_->c_str(), "utf-8");
-        GDateTime *now = g_date_time_new_now_local();
+        GDateTime *now = date_ ? g_date_time_new_from_unix_utc(date_->as_unix()) : g_date_time_new_now_local();
         g_mime_message_set_date(message.object, now);
         g_date_time_unref(now);
         for (const auto &[name, value]: headers_)
@@ -440,7 +446,20 @@ namespace sc::mime {
             body = html_ ? text_part("html", *html_) : text_part("plain", text_.value_or(""));
         }
         // A file as a part: base64, its disposition, name and Content-ID.
-        const auto file_part = [](const file &each) {
+        const auto file_part = [](const file &each) -> GMimeObject * {
+            // A mail attached: a message part (RFC 2046 5.2.1: never encoded), so it's read as a
+            // message again. One that doesn't parse goes as plain bytes.
+            if (each.type == "message/rfc822") {
+                const owned<GMimeStream> stream{g_mime_stream_mem_new_with_buffer(each.bytes.data(), each.bytes.size())};
+                const owned<GMimeParser> parser{g_mime_parser_new_with_stream(stream.object)};
+                if (GMimeMessage *inner = g_mime_parser_construct_message(parser.object, nullptr)) {
+                    GMimeMessagePart *part = g_mime_message_part_new_with_message("rfc822", inner);
+                    g_object_unref(inner);
+                    g_mime_object_set_disposition(GMIME_OBJECT(part), each.inline_ ? "inline" : "attachment");
+                    if (!each.filename.empty()) g_mime_object_set_content_disposition_parameter(GMIME_OBJECT(part), "filename", each.filename.c_str());
+                    return GMIME_OBJECT(part);
+                }
+            }
             const auto slash = each.type.find('/');
             const auto type = each.type.substr(0, slash);
             const auto subtype = slash == std::string::npos ? std::string{"octet-stream"} : each.type.substr(slash + 1);

@@ -27,6 +27,7 @@ set(SOURCE_LIBRARIES)
 set(SOURCE_LINK_LIBRARIES)
 
 add_sc_object(sc_mime
+        SOURCES src/outlook.cpp src/rtf.cpp
         LINK_LIBRARIES sc::sc-core PkgConfig::gmime-3.0
         PUBLIC_LINK_LIBRARIES sc::sc-core ${SC_MIME_GMIME_LIBRARIES})
 

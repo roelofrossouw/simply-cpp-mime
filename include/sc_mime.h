@@ -129,11 +129,12 @@ namespace sc::mime {
     // A mail message. Copies share it; it's read only, and one thread at a time should use it.
     class message {
     public:
-        // Reads a message from its text (an .eml file's content). GMime takes most of what
-        // turns up in mailboxes; throws std::runtime_error when there's no message to find.
+        // Reads a message from its text (an .eml file's content), or from an Outlook .msg file's
+        // bytes (outlook_to_mime() first). GMime takes most of what turns up in mailboxes; throws
+        // std::runtime_error when there's no message to find.
         static message parse(std::string_view text);
 
-        // Reads an .eml file; throws std::runtime_error when it can't.
+        // Reads an .eml or .msg file; throws std::runtime_error when it can't.
         static message load(const std::filesystem::path &file);
 
         // Decoded, UTF-8.
@@ -215,6 +216,8 @@ namespace sc::mime {
         draft &bcc(const mailbox &who);
         draft &reply_to(const mailbox &who);
         draft &subject(std::string_view text);
+        // When it was written; the time str() is called when not given.
+        draft &date(const sc::datetime &when);
 
         // Any other header, as given (In-Reply-To, References, Auto-Submitted, X-...): a value in
         // UTF-8 that isn't plain ASCII is encoded. Each call adds one; the same name may repeat.
@@ -240,10 +243,32 @@ namespace sc::mime {
         };
         std::vector<std::pair<std::string, mailbox>> addresses_; // "from", "to", "cc", "bcc", "reply-to"
         std::optional<std::string> subject_;
+        std::optional<sc::datetime> date_;
         std::vector<mime::header> headers_;
         std::optional<std::string> text_, html_;
         std::vector<file> files_;
     };
+}
+
+namespace sc::mime {
+    // Whether bytes are an Outlook .msg file (a compound file, D0 CF 11 E0 ...).
+    [[nodiscard]] bool is_outlook(std::string_view bytes);
+
+    // An Outlook .msg file ([MS-OXMSG]) as a MIME message's text, in memory: From (the SMTP
+    // address when MAPI has it), To, Cc and Bcc from its recipients, Subject, Date (when it was
+    // sent), Message-ID; the body as text, and HTML from PR_HTML or from its RTF (rtf_to_html());
+    // its attachments with their names, types and Content-IDs (pictures the HTML shows inline),
+    // attached messages as message/rfc822 parts of their own. Throws std::runtime_error for a
+    // file that isn't one or is damaged.
+    [[nodiscard]] std::string outlook_to_mime(std::string_view msg);
+
+    // RTF as HTML (UTF-8): the HTML Outlook wrapped in RTF (\fromhtml1, [MS-OXRTFEX]) as it was;
+    // other RTF as simple HTML of its text, paragraphs and line breaks (fonts, colours, tables
+    // and pictures left out). Throws std::runtime_error for what isn't RTF.
+    [[nodiscard]] std::string rtf_to_html(std::string_view rtf);
+
+    // Outlook's compressed RTF (PR_RTF_COMPRESSED: "LZFu", or "MELA" stored as it is) as RTF.
+    [[nodiscard]] std::string decompress_rtf(std::string_view compressed);
 }
 
 #endif
