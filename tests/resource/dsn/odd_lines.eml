@@ -1,0 +1,18 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="Z"
+
+--Z
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; a
+this line is no field
+Status : 5.0.0
+ACTION:failed
+x-spam-level: ***
+Diagnostic-Code:
+  smtp; 550 folded after empty
+From someone
+last-attempt-date: Fri
+
+--Z--

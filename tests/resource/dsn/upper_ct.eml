@@ -1,0 +1,15 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="Z"
+
+--Z
+Content-Type: Message/Delivery-Status; charset=us-ascii
+
+Reporting-MTA: dns; up
+
+--Z
+Content-Type: MESSAGE/GLOBAL-HEADERS
+
+Message-Id: <g@example.com>
+
+--Z--

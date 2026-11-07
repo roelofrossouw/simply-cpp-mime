@@ -1,0 +1,29 @@
+From: postmaster@example.org
+To: sender@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="B3"
+
+--B3
+Content-Type: message/delivery-status
+Content-Transfer-Encoding: base64
+
+UmVwb3J0aW5nLU1UQTogZG5zOyBteC5leGFtcGxlLm9yZwoKRmluYWwtUmVjaXBpZW50OiByZmM4
+MjI7IGFAZXhhbXBsZS5vcmcKQWN0aW9uOiBkZWxheWVkClN0YXR1czogNC40LjEK
+
+--B3
+Content-Type: message/global-headers
+
+Message-ID: <g@example.com>
+To: a@example.org
+X-Other: no
+
+--B3
+Content-Type: multipart/mixed; boundary="B4"
+
+--B4
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; inner.example.org
+Action: failed
+--B4--
+--B3--

@@ -1,0 +1,9 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="Z"
+
+--Z
+
+Reporting-MTA: dns; none
+
+--Z--

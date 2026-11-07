@@ -7,6 +7,7 @@
 #include <datetime.h>
 
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -269,6 +270,21 @@ namespace sc::mime {
 
     // Outlook's compressed RTF (PR_RTF_COMPRESSED: "LZFu", or "MELA" stored as it is) as RTF.
     [[nodiscard]] std::string decompress_rtf(std::string_view compressed);
+
+    // What a bounce (a delivery status notification, RFC 3464) says, field by field, as 1web's
+    // correspondence.read_dsn() read it with Perl's MIME-tools, so its callers get the same keys:
+    // every field of its message/delivery-status and message/global-delivery-status parts, and
+    // from its text/rfc822-headers and message/global-headers parts those whose names start with
+    // Message-ID, To or Received. Parts are taken depth first (attached messages aren't opened);
+    // a field seen again replaces the earlier one, within a part the first of a name counts.
+    //   names    as Mail::Header writes them: each word capitalised, ID, MIME, SOAP, LDAP, SWE and
+    //            words without a vowel in capitals (Reporting-Mta, X-Postfix-Queue-ID, Received-SPF)
+    //   values   as written after the colon, leading space dropped, folded lines kept as they are
+    //            ("\n" and the continuation's own indent)
+    // A part's fields end at its first empty line, after blank lines between blocks (per message,
+    // per recipient) are dropped: but a part with CRLF line ends keeps only its first block, as
+    // MIME-tools did. Lines that aren't fields are skipped. Empty when it's no bounce.
+    [[nodiscard]] std::map<std::string, std::string> delivery_report(const message &bounce);
 }
 
 #endif

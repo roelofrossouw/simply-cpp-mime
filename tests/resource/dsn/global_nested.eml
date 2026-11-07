@@ -1,0 +1,31 @@
+From: postmaster@example.net
+To: sender@example.com
+Subject: Delivery failure
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="B2"
+
+--B2
+Content-Type: text/plain; charset=utf-8
+
+Fehler.
+
+--B2
+Content-Type: message/global-delivery-status
+
+Reporting-MTA: dns; mx.example.net
+
+Final-Recipient: utf-8; jörg@example.net
+Action: failed
+Status: 5.2.2
+Diagnostic-Code: smtp; 552 Mailbox voll — over quota
+
+--B2
+Content-Type: message/rfc822
+
+Received: from a.example.com by b.example.net; Fri, 6 Nov 2026 10:00:00 +0000
+Message-ID: <nested@example.com>
+To: jörg@example.net
+Subject: hi
+
+body text
+--B2--

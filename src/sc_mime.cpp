@@ -503,3 +503,129 @@ namespace sc::mime {
         return bytes_of(stream.object);
     }
 }
+
+// delivery_report: Perl's MIME-tools (MIME::Parser, Mail::Header 2.21) as correspondence.read_dsn used it.
+namespace sc::mime {
+    namespace {
+        // Mail::Header's _tag_case: each word between '-' capitalised; ID, MIME, SWE, SOAP, LDAP and
+        // words of consonants only in capitals.
+        std::string tag_case(const std::string_view tag) {
+            static constexpr std::string_view consonants = "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ";
+            std::string out;
+            std::size_t start = 0;
+            while (true) {
+                const auto dash = tag.find('-', start);
+                const auto word = tag.substr(start, dash == std::string_view::npos ? std::string_view::npos : dash - start);
+                std::string upper{word};
+                for (auto &c: upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                const bool capitals = (!word.empty() && word.find_first_not_of(consonants) == std::string_view::npos) || upper == "MIME" ||
+                                      upper == "SWE" || upper == "SOAP" || upper == "LDAP" || upper == "ID";
+                if (capitals) {
+                    out += upper;
+                } else {
+                    for (std::size_t i = 0; i < word.size(); ++i)
+                        out += static_cast<char>(i == 0 ? std::toupper(static_cast<unsigned char>(word[i])) : std::tolower(static_cast<unsigned char>(word[i])));
+                }
+                if (dash == std::string_view::npos) break;
+                out += '-';
+                start = dash + 1;
+            }
+            return out;
+        }
+
+        // A field's name before its colon, as Mail::Header's $FIELD_NAME takes it: bytes that aren't
+        // control characters, DEL, 8-bit, space or colon. 0: the line isn't a field.
+        std::size_t field_name_length(const std::string_view line) {
+            std::size_t at = 0;
+            while (at < line.size()) {
+                const auto c = static_cast<unsigned char>(line[at]);
+                if (c == ':') return at;
+                if (c <= 0x1f || c >= 0x7f || c == ' ') return 0;
+                ++at;
+            }
+            return 0;
+        }
+
+        // A header block as MIME::Parser reads one into a Mail::Header: up to the first empty line;
+        // folded lines joined with their "\n"; lines that aren't fields skipped; the first field of
+        // a name kept (get() gives it), its value after the colon without leading white space.
+        std::map<std::string, std::string> header_block(const std::string_view text) {
+            std::map<std::string, std::string> out;
+            std::string tag, value;
+            bool open = false;
+            const auto close = [&] {
+                if (!open) return;
+                // Perl's s/\n*$/\n/ then chomp: no trailing newlines
+                while (!value.empty() && value.back() == '\n') value.pop_back();
+                out.try_emplace(tag, value);
+                open = false;
+            };
+            std::size_t at = 0;
+            while (at <= text.size()) {
+                if (at == text.size()) break;
+                auto end = text.find('\n', at);
+                const bool last = end == std::string_view::npos;
+                if (last) end = text.size();
+                auto line = text.substr(at, end - at);
+                if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+                at = last ? text.size() : end + 1;
+                if (open && !line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+                    value += '\n';
+                    value += line;
+                    continue;
+                }
+                close();
+                if (line.empty()) break;
+                const auto name = field_name_length(line);
+                if (name != 0) {
+                    tag = tag_case(line.substr(0, name));
+                    value.assign(line.substr(name + 1));
+                } else if (line.starts_with("From ")) {
+                    // An mbox "From " line: Mail::Header keeps it as the field "From " (its space kept)
+                    tag = "From ";
+                    value.assign(line.substr(5));
+                } else {
+                    continue;
+                }
+                open = true;
+            }
+            close();
+            // get()'s s/^\s+//: leading white space, folds included
+            for (auto &[name, text_value]: out) {
+                std::size_t from = 0;
+                while (from < text_value.size() && std::isspace(static_cast<unsigned char>(text_value[from]))) ++from;
+                text_value.erase(0, from);
+            }
+            return out;
+        }
+
+        bool starts_with_any(const std::string &tag) {
+            return tag.starts_with("Message-ID") || tag.starts_with("To") || tag.starts_with("Received");
+        }
+    }
+
+    std::map<std::string, std::string> delivery_report(const message &bounce) {
+        std::map<std::string, std::string> out;
+        for (const auto &part: bounce.leaves()) {
+            const auto type = part.type().name();
+            const bool status = type == "message/delivery-status" || type == "message/global-delivery-status";
+            if (!status && type != "text/rfc822-headers" && type != "message/global-headers") continue;
+            auto data = part.data();
+            if (data.empty()) continue;
+            // Perl's s/\n\n/\n/g: blank lines between blocks dropped (CRLF line ends keep theirs)
+            std::string collapsed;
+            collapsed.reserve(data.size());
+            for (std::size_t i = 0; i < data.size(); ++i) {
+                if (data[i] == '\n' && i + 1 < data.size() && data[i + 1] == '\n') {
+                    collapsed += '\n';
+                    ++i;
+                    continue;
+                }
+                collapsed += data[i];
+            }
+            for (auto &[tag, value]: header_block(collapsed))
+                if (status || starts_with_any(tag)) out[tag] = value;
+        }
+        return out;
+    }
+}

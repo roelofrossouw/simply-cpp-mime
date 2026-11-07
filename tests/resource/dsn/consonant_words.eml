@@ -1,0 +1,14 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="Z"
+
+--Z
+Content-Type: message/delivery-status
+
+X-SMTP-Rcpt: 1
+X-MS-Exchange-ID: 2
+DSN-Gateway: 3
+www-thing: 4
+Abc--def: 5
+
+--Z--

@@ -1,0 +1,25 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="Z"
+
+--Z
+Content-Type: message/delivery-status
+
+Action: delayed
+Action: failed
+Status: 4.0.0
+
+Status: 5.0.0
+
+--Z
+Content-Type: text/rfc822-headers
+
+Received: one
+Received: two
+MESSAGE-ID: <u@example.com>
+to: x@example.com
+To-Do: nope
+Topic: maybe
+In-Reply-To: no
+
+--Z--

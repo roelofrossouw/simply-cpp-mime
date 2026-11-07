@@ -1,0 +1,6 @@
+From: x@example.com
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; single.example.com
+action: Failed
+STATUS: 5.0.0

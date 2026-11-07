@@ -76,6 +76,10 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
 - **RTF:** `rtf_to_html(rtf)` gives the HTML Outlook wraps in RTF (`\fromhtml1`) as it was,
   and other RTF as simple HTML of its text, paragraphs and line breaks;
   `decompress_rtf()` reads Outlook's compressed RTF (LZFu, or MELA stored as it is).
+- **Bounces:** `delivery_report(message)` gives a delivery status notification's fields
+  (Reporting-Mta, Final-Recipient, Action, Status, Diagnostic-Code ..., and Message-ID, To and
+  Received of the returned message's headers) as Perl's MIME-tools read them, so code moving off
+  it keeps its keys and values.
 - `draft::date(when)` sets the Date; without it, the time it's written.
 - Not yet: mbox files, S/MIME and PGP (GMime can do all three).
 

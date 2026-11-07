@@ -1,0 +1,15 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="B5"
+
+--B5
+Content-Type: message/delivery-status
+
+--B5
+Content-Type: text/rfc822-headers
+
+To: y@example.com
+Received-SPF: pass
+Message-ID: <m@example.com>
+X-Message-ID-Old: <o@example.com>
+--B5--

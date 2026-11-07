@@ -1,0 +1,15 @@
+From: a@example.com
+MIME-Version: 1.0
+Content-Type: multipart/report; boundary="Z"
+
+--Z
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; a
+
+
+
+Final-Recipient: rfc822; b@example.com
+Action: failed
+
+--Z--
