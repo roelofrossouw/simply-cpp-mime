@@ -137,6 +137,43 @@ int main() {
         CHECK_THROWS_AS(sc::mime::message::parse("just some text\nwithout headers\n"), std::runtime_error);
     }
 
+    SECTION("raw_header(): as written, folds joined; in_reply_to() and references() without <>");
+    {
+        const auto mail = sc::mime::message::parse(headers_and_text);
+        CHECK_EQ(mail.raw_header("subject").value_or("(none)"), string{"=?ISO-8859-1?Q?Caf=E9?= and =?UTF-8?B?4pyT?="});
+        CHECK_EQ(mail.raw_header("From").value_or("(none)"), string{"=?UTF-8?Q?Ren=C3=A9_Botha?= <rene@example.com>"});
+        CHECK(!mail.raw_header("Thread-Index").has_value());
+        CHECK(mail.in_reply_to().empty());
+        CHECK(mail.references().empty());
+        const auto reply = sc::mime::message::parse(crlf("From: a@example.com\nTo: \"Smith, J\" <j@example.com>,\n\tk@example.com\n"
+                                                         "In-Reply-To: <omq1f2e.3@example.com> <other@example.com>\n"
+                                                         "References: <first@example.com>\n <omq1f2e.3@example.com>\n"
+                                                         "Message-ID: <r@example.com>\n\nThanks\n"));
+        CHECK_EQ(reply.raw_header("To").value_or("(none)"), string{"\"Smith, J\" <j@example.com>,\tk@example.com"});
+        CHECK_EQ(reply.in_reply_to(), string{"omq1f2e.3@example.com"});
+        const auto references = reply.references();
+        CHECK_EQ(references.size(), std::size_t{2});
+        if (references.size() == 2) {
+            CHECK_EQ(references[0], string{"first@example.com"});
+            CHECK_EQ(references[1], string{"omq1f2e.3@example.com"});
+        }
+    }
+
+    SECTION("text() is always valid UTF-8: Windows-1252 under a Latin-1 label, an unknown charset or none");
+    {
+        const string body = "Caf\xe9 \x93quoted\x94 \x80 10\n";
+        const string expected = "Café “quoted” € 10\n";
+        for (const string type: {"text/plain; charset=iso-8859-1", "text/plain; charset=windows-1252", "text/plain; charset=x-unknown", "text/plain"}) {
+            const auto mail = sc::mime::message::parse("From: a@example.com\nMIME-Version: 1.0\nContent-Type: " + type +
+                                                       "\nContent-Transfer-Encoding: 8bit\n\n" + body);
+            CHECK_EQ(mail.text().value_or("(none)"), expected);
+        }
+        // UTF-8 stays as it is, with a stray byte read as Windows-1252
+        const auto mixed = sc::mime::message::parse("From: a@example.com\nMIME-Version: 1.0\nContent-Type: text/plain; charset=utf-8\n"
+                                                    "Content-Transfer-Encoding: 8bit\n\n\xe2\x9c\x93 ok \x96 dash\n");
+        CHECK_EQ(mixed.text().value_or("(none)"), string{"✓ ok – dash\n"});
+    }
+
     SECTION("content_type: is(), parameter(), str() quoting what needs it");
     {
         const sc::mime::content_type type{"text", "plain", {{"charset", "utf-8"}, {"name", "my notes.txt"}}};

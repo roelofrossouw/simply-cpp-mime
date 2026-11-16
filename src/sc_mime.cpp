@@ -8,6 +8,7 @@
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace sc::mime {
     namespace detail {
@@ -88,6 +89,101 @@ namespace sc::mime {
             GMimeHeader *found = g_mime_header_list_get_header(list, std::string{name}.c_str());
             if (!found) return std::nullopt;
             return text_of(g_mime_header_get_value(found));
+        }
+
+        std::optional<std::string> raw_header_in(GMimeObject *object, const std::string_view name) {
+            GMimeHeaderList *list = g_mime_object_get_header_list(object);
+            if (!list) return std::nullopt;
+            GMimeHeader *found = g_mime_header_list_get_header(list, std::string{name}.c_str());
+            if (!found) return std::nullopt;
+            std::string value = text_of(g_mime_header_get_raw_value(found));
+            std::erase_if(value, [](const char c) { return c == '\r' || c == '\n'; }); // folds joined
+            const auto first = value.find_first_not_of(" \t");
+            if (first == std::string::npos) return std::string{};
+            return value.substr(first, value.find_last_not_of(" \t") - first + 1);
+        }
+
+        // Message-IDs in a header as written (In-Reply-To, References), each without its <>.
+        std::vector<std::string> message_ids(const std::optional<std::string> &raw) {
+            std::vector<std::string> out;
+            if (!raw || raw->empty()) return out;
+            GMimeReferences *found = g_mime_references_parse(nullptr, raw->c_str());
+            if (!found) return out;
+            const int count = g_mime_references_length(found);
+            for (int i = 0; i < count; ++i) out.push_back(text_of(g_mime_references_get_message_id(found, i)));
+            g_mime_references_free(found);
+            return out;
+        }
+
+        // Windows-1252's characters for 0x80-0x9F (0 where it has none: the code point stays).
+        constexpr char32_t windows_1252[32] = {
+            0x20AC, 0, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0, 0x017D, 0,
+            0, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0, 0x017E, 0x0178};
+
+        void append_utf8(std::string &out, const char32_t c) {
+            if (c < 0x80) {
+                out += static_cast<char>(c);
+            } else if (c < 0x800) {
+                out += static_cast<char>(0xC0 | (c >> 6));
+                out += static_cast<char>(0x80 | (c & 0x3F));
+            } else if (c < 0x10000) {
+                out += static_cast<char>(0xE0 | (c >> 12));
+                out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+                out += static_cast<char>(0x80 | (c & 0x3F));
+            } else {
+                out += static_cast<char>(0xF0 | (c >> 18));
+                out += static_cast<char>(0x80 | ((c >> 12) & 0x3F));
+                out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+                out += static_cast<char>(0x80 | (c & 0x3F));
+            }
+        }
+
+        char32_t from_windows_1252(const char32_t c) {
+            if (c >= 0x80 && c <= 0x9F && windows_1252[c - 0x80]) return windows_1252[c - 0x80];
+            return c;
+        }
+
+        // The UTF-8 sequence at text[at] (its code point and length), or a length of 0 when the
+        // bytes there aren't one: a stray byte, a cut sequence, an overlong form or a surrogate.
+        std::pair<char32_t, std::size_t> utf8_at(const std::string_view text, const std::size_t at) {
+            const auto byte = [&](const std::size_t i) { return static_cast<unsigned char>(text[i]); };
+            const unsigned char lead = byte(at);
+            if (lead < 0x80) return {lead, 1};
+            std::size_t length;
+            char32_t c;
+            if (lead >= 0xC2 && lead <= 0xDF) length = 2, c = lead & 0x1F;
+            else if (lead >= 0xE0 && lead <= 0xEF) length = 3, c = lead & 0x0F;
+            else if (lead >= 0xF0 && lead <= 0xF4) length = 4, c = lead & 0x07;
+            else return {0, 0};
+            if (at + length > text.size()) return {0, 0};
+            for (std::size_t i = 1; i < length; ++i) {
+                if ((byte(at + i) & 0xC0) != 0x80) return {0, 0};
+                c = (c << 6) | (byte(at + i) & 0x3F);
+            }
+            if ((length == 3 && c < 0x800) || (length == 4 && (c < 0x10000 || c > 0x10FFFF)) || (c >= 0xD800 && c <= 0xDFFF)) return {0, 0};
+            return {c, length};
+        }
+
+        // Text made valid UTF-8: what isn't (bytes a wrong or missing charset left as they were)
+        // read as Windows-1252, and C1 controls (ISO-8859-1's reading of Windows-1252) as its
+        // characters.
+        std::string valid_utf8(const std::string &text) {
+            std::string out;
+            out.reserve(text.size());
+            for (std::size_t at = 0; at < text.size();) {
+                const auto [c, length] = utf8_at(text, at);
+                if (length == 0) {
+                    append_utf8(out, from_windows_1252(static_cast<unsigned char>(text[at])));
+                    ++at;
+                } else if (c >= 0x80 && c <= 0x9F) {
+                    append_utf8(out, from_windows_1252(c));
+                    at += length;
+                } else {
+                    out.append(text, at, length);
+                    at += length;
+                }
+            }
+            return out;
         }
 
         std::vector<header> headers_in(GMimeObject *object) {
@@ -204,6 +300,8 @@ namespace sc::mime {
 
     std::vector<header> part::headers() const { return headers_in(object_); }
 
+    std::optional<std::string> part::raw_header(const std::string_view name) const { return raw_header_in(object_, name); }
+
     std::string part::data() const {
         if (GMIME_IS_MESSAGE_PART(object_)) {
             GMimeMessage *inner = g_mime_message_part_get_message(GMIME_MESSAGE_PART(object_));
@@ -219,10 +317,14 @@ namespace sc::mime {
 
     std::string part::text() const {
         if (!GMIME_IS_TEXT_PART(object_)) throw std::logic_error("sc::mime: " + type().name() + " isn't text");
+        // UTF-8, ASCII or no charset: the bytes as they are (GMime would drop the ones that don't fit)
+        const auto charset = lowercase(type().parameter("charset").value_or(""));
+        if (charset.empty() || charset == "utf-8" || charset == "utf8" || charset == "us-ascii" || charset == "ascii")
+            return valid_utf8(without_carriage_returns(data()));
         char *text = g_mime_text_part_get_text(GMIME_TEXT_PART(object_));
         std::string out = text_of(text);
         g_free(text);
-        return without_carriage_returns(std::move(out));
+        return valid_utf8(without_carriage_returns(std::move(out)));
     }
 
     bool part::is_multipart() const { return GMIME_IS_MULTIPART(object_); }
@@ -305,6 +407,15 @@ namespace sc::mime {
     std::optional<std::string> message::header(const std::string_view name) const { return header_in(GMIME_OBJECT(message_), name); }
 
     std::vector<header> message::headers() const { return headers_in(GMIME_OBJECT(message_)); }
+
+    std::optional<std::string> message::raw_header(const std::string_view name) const { return raw_header_in(GMIME_OBJECT(message_), name); }
+
+    std::string message::in_reply_to() const {
+        const auto ids = message_ids(raw_header("In-Reply-To"));
+        return ids.empty() ? std::string{} : ids.front();
+    }
+
+    std::vector<std::string> message::references() const { return message_ids(raw_header("References")); }
 
     part message::body() const {
         GMimeObject *top = g_mime_message_get_mime_part(message_);

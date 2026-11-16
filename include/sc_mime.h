@@ -94,13 +94,20 @@ namespace sc::mime {
 
         [[nodiscard]] std::vector<mime::header> headers() const;
 
+        // A header's value as written: not decoded (RFC 2047 words kept), its folds joined and the
+        // space around it trimmed; nullopt when absent.
+        [[nodiscard]] std::optional<std::string> raw_header(std::string_view name) const;
+
         // The content, its transfer encoding undone: a picture's or a PDF's bytes, text in its own
         // charset. An attached message comes as the whole message's text; a multipart as it was
         // sent.
         [[nodiscard]] std::string data() const;
 
-        // A text part's content in UTF-8, converted from its charset, with line ends as "\n".
-        // Throws std::logic_error for a part that isn't text.
+        // A text part's content in UTF-8, converted from its charset, with line ends as "\n". It's
+        // always valid UTF-8: bytes its charset can't account for (a wrong, unknown or missing
+        // charset) read as Windows-1252, and so do ISO-8859-1's C1 controls (Outlook's quotes and
+        // euro sign under a Latin-1 label), as browsers read them. Throws std::logic_error for a
+        // part that isn't text.
         [[nodiscard]] std::string text() const;
 
         [[nodiscard]] bool is_multipart() const;
@@ -165,6 +172,16 @@ namespace sc::mime {
 
         // Every header but the Content- ones, in order, repeats included.
         [[nodiscard]] std::vector<mime::header> headers() const;
+
+        // A header's value as written (see part::raw_header); nullopt when absent.
+        [[nodiscard]] std::optional<std::string> raw_header(std::string_view name) const;
+
+        // The message this one answers (In-Reply-To), without its <>: the first when it names
+        // several; empty when there's none.
+        [[nodiscard]] std::string in_reply_to() const;
+
+        // The thread before it (References), oldest first, each without its <>; empty when none.
+        [[nodiscard]] std::vector<std::string> references() const;
 
         // The top part: a single text, or the multipart holding the rest.
         [[nodiscard]] part body() const;

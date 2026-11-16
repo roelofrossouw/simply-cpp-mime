@@ -36,8 +36,8 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
 
 | Type | | |
 |---|---|---|
-| `sc::mime::message` | `parse()`, `load()`; `subject()`, `from()` ... `bcc()`, `date()`, `message_id()`, `header()`, `headers()`; `body()`, `text()`, `html()`, `attachments()`, `leaves()` | a message |
-| `sc::mime::part` | `type()`, `is()`, `disposition()`, `filename()`, `content_id()`, `transfer_encoding()`, `header()`, `headers()`; `data()`, `text()`; `parts()`, `message()`, `is_attachment()` | one part |
+| `sc::mime::message` | `parse()`, `load()`; `subject()`, `from()` ... `bcc()`, `date()`, `message_id()`, `in_reply_to()`, `references()`, `header()`, `raw_header()`, `headers()`; `body()`, `text()`, `html()`, `attachments()`, `leaves()` | a message |
+| `sc::mime::part` | `type()`, `is()`, `disposition()`, `filename()`, `content_id()`, `transfer_encoding()`, `header()`, `raw_header()`, `headers()`; `data()`, `text()`; `parts()`, `message()`, `is_attachment()` | one part |
 | `sc::mime::content_type` | `type`, `subtype`, `parameters`; `name()`, `is()`, `parameter()`, `str()` | "text/plain; charset=utf-8" |
 | `sc::mime::mailbox` | `name`, `address`; `str()` | "Ann <ann@example.com>" |
 | `sc::mime::header` | `name`, `value` | unfolded, decoded |
@@ -49,7 +49,12 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
   when a mixed multipart holds several text pieces with pictures between them
   (Apple Mail does this), they're joined. `html()` is found the same way, inside
   multipart/related too. Text attachments don't count. Text comes in UTF-8,
-  converted from its charset, with `\n` line ends.
+  converted from its charset, with `\n` line ends, and it's always valid UTF-8:
+  bytes the charset can't account for (a wrong, unknown or missing charset) and
+  ISO-8859-1's C1 controls read as Windows-1252, as browsers read them.
+- **Headers:** `header()` decodes (RFC 2047) and unfolds; `raw_header()` gives
+  the value as written, folds joined. `in_reply_to()` and `references()` are
+  the Message-IDs without their `<>`.
 - **Attachments** are every part that's a file rather than body text: those
   marked attachment, any part with a file name, and whatever isn't text/plain
   or text/html (pictures shown in the HTML, signatures, attached messages).
