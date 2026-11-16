@@ -186,6 +186,15 @@ namespace sc::mime {
             return out;
         }
 
+        // Whether iconv can read a charset (by GMime's name for it) into UTF-8. Not GMime's own
+        // g_mime_iconv_open(): it falls back to a charset that drops the bytes it can't read.
+        bool convertible(const std::string &charset) {
+            const GIConv cd = g_iconv_open("UTF-8", g_mime_charset_iconv_name(charset.c_str()));
+            if (cd == reinterpret_cast<GIConv>(-1)) return false;
+            g_iconv_close(cd);
+            return true;
+        }
+
         std::vector<header> headers_in(GMimeObject *object) {
             std::vector<header> out;
             GMimeHeaderList *list = g_mime_object_get_header_list(object);
@@ -317,9 +326,10 @@ namespace sc::mime {
 
     std::string part::text() const {
         if (!GMIME_IS_TEXT_PART(object_)) throw std::logic_error("sc::mime: " + type().name() + " isn't text");
-        // UTF-8, ASCII or no charset: the bytes as they are (GMime would drop the ones that don't fit)
+        // UTF-8, ASCII, no charset or one iconv doesn't know: the bytes as they are (GMime would
+        // drop the ones that don't fit), made valid below
         const auto charset = lowercase(type().parameter("charset").value_or(""));
-        if (charset.empty() || charset == "utf-8" || charset == "utf8" || charset == "us-ascii" || charset == "ascii")
+        if (charset.empty() || charset == "utf-8" || charset == "utf8" || charset == "us-ascii" || charset == "ascii" || !convertible(charset))
             return valid_utf8(without_carriage_returns(data()));
         char *text = g_mime_text_part_get_text(GMIME_TEXT_PART(object_));
         std::string out = text_of(text);
