@@ -96,8 +96,20 @@ namespace sc::mime {
             if (!list) return std::nullopt;
             GMimeHeader *found = g_mime_header_list_get_header(list, std::string{name}.c_str());
             if (!found) return std::nullopt;
-            std::string value = text_of(g_mime_header_get_raw_value(found));
-            std::erase_if(value, [](const char c) { return c == '\r' || c == '\n'; }); // folds joined
+            const std::string raw = text_of(g_mime_header_get_raw_value(found));
+            // Unfolded: each line break with the spaces and tabs after it becomes one space, so encoded words
+            // folded with a tab stay apart by a plain space as RFC 2047 decoders expect
+            std::string value;
+            value.reserve(raw.size());
+            for (std::size_t i = 0; i < raw.size();) {
+                if (raw[i] != '\r' && raw[i] != '\n') {
+                    value += raw[i++];
+                    continue;
+                }
+                while (i < raw.size() && (raw[i] == '\r' || raw[i] == '\n' || raw[i] == ' ' || raw[i] == '\t')) ++i;
+                while (!value.empty() && (value.back() == ' ' || value.back() == '\t')) value.pop_back();
+                if (!value.empty() && i < raw.size()) value += ' ';
+            }
             const auto first = value.find_first_not_of(" \t");
             if (first == std::string::npos) return std::string{};
             return value.substr(first, value.find_last_not_of(" \t") - first + 1);

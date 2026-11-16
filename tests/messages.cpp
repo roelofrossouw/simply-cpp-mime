@@ -148,8 +148,11 @@ int main() {
         const auto reply = sc::mime::message::parse(crlf("From: a@example.com\nTo: \"Smith, J\" <j@example.com>,\n\tk@example.com\n"
                                                          "In-Reply-To: <omq1f2e.3@example.com> <other@example.com>\n"
                                                          "References: <first@example.com>\n <omq1f2e.3@example.com>\n"
+                                                         "Subject: =?utf-8?Q?Caf=C3=A9?=\n\t=?utf-8?Q?_bond?=\n"
                                                          "Message-ID: <r@example.com>\n\nThanks\n"));
-        CHECK_EQ(reply.raw_header("To").value_or("(none)"), string{"\"Smith, J\" <j@example.com>,\tk@example.com"});
+        CHECK_EQ(reply.raw_header("To").value_or("(none)"), string{"\"Smith, J\" <j@example.com>, k@example.com"}); // a fold is one space
+        CHECK_EQ(reply.raw_header("Subject").value_or("(none)"), string{"=?utf-8?Q?Caf=C3=A9?= =?utf-8?Q?_bond?="});
+        CHECK_EQ(reply.raw_header("References").value_or("(none)"), string{"<first@example.com> <omq1f2e.3@example.com>"});
         CHECK_EQ(reply.in_reply_to(), string{"omq1f2e.3@example.com"});
         const auto references = reply.references();
         CHECK_EQ(references.size(), std::size_t{2});

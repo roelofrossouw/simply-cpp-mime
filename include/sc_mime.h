@@ -94,8 +94,8 @@ namespace sc::mime {
 
         [[nodiscard]] std::vector<mime::header> headers() const;
 
-        // A header's value as written: not decoded (RFC 2047 words kept), its folds joined and the
-        // space around it trimmed; nullopt when absent.
+        // A header's value as written: not decoded (RFC 2047 words kept), each fold (the line break and
+        // the spaces and tabs around it) one space, the space around it trimmed; nullopt when absent.
         [[nodiscard]] std::optional<std::string> raw_header(std::string_view name) const;
 
         // The content, its transfer encoding undone: a picture's or a PDF's bytes, text in its own
