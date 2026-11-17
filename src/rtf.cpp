@@ -2,7 +2,7 @@
 // either the HTML Outlook wrapped in RTF ([MS-OXRTFEX], \fromhtml1) or, for RTF written as RTF, simple
 // HTML of its text and paragraphs.
 
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 
 #include <glib.h>
 

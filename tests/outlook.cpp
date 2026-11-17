@@ -1,7 +1,7 @@
 // Outlook .msg files read as messages (a file resource/make_msg.py writes: recipients, an RTF body
 // wrapping HTML, attachments in the mini stream and in sectors of their own, an inline picture, an
 // attached message), RTF as HTML, compressed RTF, and a draft's own date.
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 #include "sc_test.h"
 
 #include <cstdlib>

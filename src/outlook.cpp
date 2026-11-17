@@ -1,7 +1,7 @@
 // Outlook .msg files ([MS-OXMSG]): a compound file ([MS-CFB]) of MAPI properties, turned into a MIME
 // message with draft, so message::parse() reads them as it reads .eml.
 
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 
 #include <glib.h>
 

@@ -1,7 +1,7 @@
 // A message's headers: encoded words (RFC 2047) in the subject and names, address lists with a
 // group, the date, Message-ID, repeated headers, a quoted-printable Latin-1 body read as UTF-8, CRLF
 // line ends, and what happens with files that aren't there.
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 #include "sc_test.h"
 
 #include <filesystem>

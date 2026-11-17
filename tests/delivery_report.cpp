@@ -1,6 +1,6 @@
 // delivery_report against Perl's MIME-tools 5.509 / Mail::Header 2.21 running correspondence.read_dsn's code
 // on the bounces in resource/dsn (made up; example.com addresses), recorded 2026-11-07.
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 
 #include "sc_test.h"
 

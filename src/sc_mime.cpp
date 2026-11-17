@@ -1,4 +1,4 @@
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 
 #include <gmime/gmime.h>
 

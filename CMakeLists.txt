@@ -8,7 +8,7 @@ option(SC_MIME_BUILD_TESTS "Build simply-cpp-mime tests" ${PROJECT_IS_TOP_LEVEL}
 get_sc_version()
 message(STATUS "SimplyCPP ${SC_MODULE} Version: ${SC_VERSION}")
 
-find_or_install_package(sc-core simply-cpp-dev simply-cpp 1.20.0)
+find_or_install_package(sc-core simply-cpp-dev simply-cpp 2.2.0)
 # GMime 3 (LGPL-2.1-or-later) parses the messages; it's built on GLib (gobject, glib), whose
 # functions the code calls directly too, so a static library's users link all three.
 config_or_install_package(gmime-3.0 libgmime-3.0-dev gmime)

@@ -1,7 +1,7 @@
 // A message with every kind of part: alternatives (plain and HTML), a picture the HTML shows by
 // Content-ID, a PDF with an RFC 2231 file name, an attached message and a text file; which of them
 // are body text and which are files, their bytes, and parts outliving the message they came from.
-#include "sc_mime.h"
+#include <sc/mime/sc_mime.h>
 #include "sc_test.h"
 
 #include <string>

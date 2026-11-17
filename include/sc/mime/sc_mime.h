@@ -4,7 +4,7 @@
 // and get its headers, addresses, date, body text and attachments, every part of it decoded; or
 // write one (draft): addresses, subject, headers, a text and an HTML body, attachments.
 // GMime does the parsing and the writing; nothing of GMime or GLib shows here.
-#include <datetime.h>
+#include <sc/core/datetime.h>
 
 #include <filesystem>
 #include <map>

@@ -6,8 +6,8 @@
 //     sc-mime-demo invoice.eml --extract out
 //     sc-mime-demo invoice.eml --reply | sendmail -t
 
-#include <sc_mime.h>
-#include <params.h>
+#include <sc/mime/sc_mime.h>
+#include <sc/core/params.h>
 
 #include <filesystem>
 #include <fstream>
