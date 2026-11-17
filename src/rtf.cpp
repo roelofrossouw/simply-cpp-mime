@@ -248,6 +248,8 @@ namespace sc::mime {
                 if (word == "emdash") emit("\xE2\x80\x94");
             }
 
+            // Not sc::utf8::encode(): RTF writes characters above U+FFFF as two \u surrogates, and this
+            // keeps each one as it comes (sc-core's would turn them into U+FFFD).
             static std::string utf8(const std::uint32_t c) {
                 std::string out;
                 if (c < 0x80) {

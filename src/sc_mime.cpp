@@ -1,5 +1,7 @@
 #include <sc/mime/sc_mime.h>
 
+#include <sc/core/core.h>
+
 #include <gmime/gmime.h>
 
 #include <algorithm>
@@ -30,11 +32,6 @@ namespace sc::mime {
         }
 
         std::string text_of(const char *text) { return text ? text : ""; }
-
-        std::string lowercase(std::string text) {
-            std::ranges::transform(text, text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            return text;
-        }
 
         bool same_name(const std::string_view a, const std::string_view b) {
             return std::ranges::equal(a, b, [](const unsigned char x, const unsigned char y) { return std::tolower(x) == std::tolower(y); });
