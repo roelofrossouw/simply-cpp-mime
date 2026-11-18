@@ -1,7 +1,7 @@
 // Writing a message (draft) and reading it back: addresses with UTF-8 names, an encoded subject,
 // extra headers kept as given, text and HTML as multipart/alternative, attachments (one inline with
 // a Content-ID) in multipart/mixed, the date set, and CRLF line ends on request.
-#include <sc/mime/sc_mime.h>
+#include <sc/mime/mime.h>
 #include "sc_test.h"
 
 #include <string>

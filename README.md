@@ -9,7 +9,7 @@ does the parsing and writing, and none of GMime or GLib shows in the API.
 **Documentation:** the [simply-cpp wiki](https://github.com/roelofrossouw/simply-cpp/wiki) has a [Mail guide](https://github.com/roelofrossouw/simply-cpp/wiki/Mail) and the [sc-mime reference](https://github.com/roelofrossouw/simply-cpp/wiki/Reference-sc-mime).
 
 ```cpp
-#include <sc/mime/sc_mime.h>
+#include <sc/mime/mime.h>
 
 const auto mail = sc::mime::message::load("invoice.eml");   // or message::parse(text)
 mail.subject();                       // "The résumé", encoded words decoded

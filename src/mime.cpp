@@ -1,4 +1,4 @@
-#include <sc/mime/sc_mime.h>
+#include <sc/mime/mime.h>
 
 #include <sc/core/core.h>
 
