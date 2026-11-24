@@ -27,11 +27,11 @@ set(SOURCE_LIBRARIES)
 set(SOURCE_LINK_LIBRARIES)
 
 add_sc_object(mime
-        SOURCES src/outlook.cpp src/rtf.cpp
+        SOURCES src/outlook.cpp src/rtf.cpp src/trace.cpp
         LINK_LIBRARIES sc::sc-core PkgConfig::gmime-3.0
         PUBLIC_LINK_LIBRARIES sc::sc-core ${SC_MIME_GMIME_LIBRARIES})
 
-add_sc_libraries(DESCRIPTION "simply-cpp MIME mail messages: headers, addresses, body text and attachments (GMime)")
+add_sc_libraries(DESCRIPTION "simply-cpp MIME mail messages: headers, addresses, body text and attachments, trace headers (GMime)")
 target_compile_features(sc-mime PUBLIC cxx_std_20)
 target_compile_features(sc-mime-shared PUBLIC cxx_std_20)
 

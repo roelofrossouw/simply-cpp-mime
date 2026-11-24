@@ -85,6 +85,13 @@ for (const auto &each: top.parts()) each.is_multipart(), each.disposition(), eac
   (Reporting-Mta, Final-Recipient, Action, Status, Diagnostic-Code ..., and Message-ID, To and
   Received of the returned message's headers) as Perl's MIME-tools read them, so code moving off
   it keeps its keys and values.
+- **Trace headers** (`<sc/mime/trace.h>`): `trace_of(message, {"mail.example.com"})` reads what
+  this host's mail server added above its own Received line: Authentication-Results under its
+  authserv-ids (`result("dmarc")->result`, `->property("header.from")`; DKIM, SPF, DMARC as
+  opendkim and opendmarc write them), Received-SPF (`spf()`), and the client that handed the mail
+  over (`client->ip`, `client->host`, `unknown_host()` for Postfix's "unknown": no reverse DNS).
+  Headers a sender wrote below that line, or under another authserv-id, don't count.
+  `parse_authentication_results()` and `parse_received()` read one header's value.
 - `draft::date(when)` sets the Date; without it, the time it's written.
 - Not yet: mbox files, S/MIME and PGP (GMime can do all three).
 
